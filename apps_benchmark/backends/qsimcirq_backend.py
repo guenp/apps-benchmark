@@ -102,7 +102,7 @@ class QsimcirqBackend(AbstractBackend):
                 # Decompose to a Cirq-importable basis. rzz, rxx, ryy, ccx,
                 # and other "exotic" gates aren't recognized by cirq's QASM
                 # parser, so we lower everything to {u, cx} which is.
-                qc_lowered = transpile(qc, basis_gates=["u", "cx"], optimization_level=0)
+                qc_lowered = transpile(qc, basis_gates=["u3", "cx"], optimization_level=0)
                 qasm_str = dumps(qc_lowered)
                 # Cirq's QASM importer doesn't recognize 'barrier'; strip it.
                 qasm_str = "\n".join(
