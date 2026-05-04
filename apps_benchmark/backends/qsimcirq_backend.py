@@ -111,12 +111,23 @@ class QsimcirqBackend(AbstractBackend):
                     f"Failed to translate circuit {idx} to Cirq via OpenQASM: {e}"
                 ) from e
 
+            # If the circuit has no measurements, sample from the statevector.
+            # apps-benchmark sends unmeasured circuits for analytical expval paths.
+            has_measurements = any(
+                op.gate is not None and hasattr(op.gate, "_is_measurement_")
+                and op.gate._is_measurement_
+                for op in cirq_circuit.all_operations()
+            )
+
             try:
-                result = self._simulator.run(cirq_circuit, repetitions=shots)
+                if has_measurements:
+                    result = self._simulator.run(cirq_circuit, repetitions=shots)
+                    counts = self._cirq_result_to_counts(result)
+                else:
+                    counts = self._sample_from_statevector(cirq_circuit, shots)
             except Exception as e:
                 raise BackendError(f"qsim execution failed on circuit {idx}: {e}") from e
 
-            counts = self._cirq_result_to_counts(result)
             measurement_batch.append(counts)
 
         job_id = str(uuid.uuid4())
@@ -141,6 +152,30 @@ class QsimcirqBackend(AbstractBackend):
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
+    def _sample_from_statevector(self, cirq_circuit, shots: int) -> dict[str, int]:
+        """Run the simulator analytically, then sample shots from |amplitude|^2.
+
+        Used when apps-benchmark hands us a circuit with no measurement
+        instructions (the framework's analytical expectation-value path).
+        """
+        import numpy as np
+
+        result = self._simulator.simulate(cirq_circuit)
+        sv = np.asarray(result.final_state_vector)
+        probs = np.abs(sv) ** 2
+        probs = probs / probs.sum()  # normalize for numerical safety
+
+        n_qubits = int(np.log2(len(sv)))
+        rng = np.random.default_rng()
+        idx_samples = rng.choice(len(sv), size=shots, p=probs)
+
+        counts: dict[str, int] = {}
+        for idx in idx_samples:
+            # Match Qiskit endianness: qubit 0 is the rightmost char.
+            bitstr = format(int(idx), f"0{n_qubits}b")
+            counts[bitstr] = counts.get(bitstr, 0) + 1
+        return counts
+
     @staticmethod
     def _cirq_result_to_counts(result) -> dict[str, int]:
         """Convert a cirq.Result to a Qiskit-style {bitstring: count} dict.
