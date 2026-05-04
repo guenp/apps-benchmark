@@ -92,14 +92,14 @@ class QsimcirqBackend(AbstractBackend):
         if not circuits:
             raise ValueError("No circuits provided to QsimcirqBackend.run()")
 
-        from cirq.contrib.qasm_import import circuit_from_qasm
+        import cirq
         from qiskit.qasm2 import dumps
 
         measurement_batch: MeasurementBatch = []
         for idx, qc in enumerate(circuits):
             try:
                 qasm_str = dumps(qc)
-                cirq_circuit = circuit_from_qasm(qasm_str)
+                cirq_circuit = cirq.read_qasm(qasm_str)
             except Exception as e:
                 raise BackendError(
                     f"Failed to translate circuit {idx} to Cirq via OpenQASM: {e}"
