@@ -99,7 +99,7 @@ class QsimcirqBackend(AbstractBackend):
         for idx, qc in enumerate(circuits):
             try:
                 qasm_str = dumps(qc)
-                cirq_circuit = cirq.read_qasm(qasm_str)
+                cirq_circuit = cirq.Circuit.from_qasm(qasm_str)
             except Exception as e:
                 raise BackendError(
                     f"Failed to translate circuit {idx} to Cirq via OpenQASM: {e}"
