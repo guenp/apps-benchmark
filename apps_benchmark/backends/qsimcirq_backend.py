@@ -98,9 +98,13 @@ class QsimcirqBackend(AbstractBackend):
         measurement_batch: MeasurementBatch = []
         for idx, qc in enumerate(circuits):
             try:
-                qasm_str = dumps(qc)
-                # Cirq's QASM importer doesn't recognize 'barrier'. It's a
-                # transpiler hint with no semantics, so it's safe to strip.
+                from qiskit import transpile
+                # Decompose to a Cirq-importable basis. rzz, rxx, ryy, ccx,
+                # and other "exotic" gates aren't recognized by cirq's QASM
+                # parser, so we lower everything to {u, cx} which is.
+                qc_lowered = transpile(qc, basis_gates=["u", "cx"], optimization_level=0)
+                qasm_str = dumps(qc_lowered)
+                # Cirq's QASM importer doesn't recognize 'barrier'; strip it.
                 qasm_str = "\n".join(
                     line for line in qasm_str.splitlines()
                     if not line.strip().startswith("barrier")
