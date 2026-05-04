@@ -99,6 +99,12 @@ class QsimcirqBackend(AbstractBackend):
         for idx, qc in enumerate(circuits):
             try:
                 qasm_str = dumps(qc)
+                # Cirq's QASM importer doesn't recognize 'barrier'. It's a
+                # transpiler hint with no semantics, so it's safe to strip.
+                qasm_str = "\n".join(
+                    line for line in qasm_str.splitlines()
+                    if not line.strip().startswith("barrier")
+                )
                 cirq_circuit = circuit_from_qasm(qasm_str)
             except Exception as e:
                 raise BackendError(
